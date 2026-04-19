@@ -4,6 +4,8 @@
 
 It is designed around modern iOS device services and, by default, builds its own tunnel through `usbmuxd + CoreDeviceProxy`, so it does not require `pymobiledevice3 tunneld` or Xcode tooling at runtime.
 
+This repo also ships an installable agent skill under [`skills/ilocation`](./skills/ilocation), so other users can install the skill with Vercel's `skills` CLI and let their agent install and operate the tool for them.
+
 ## Features
 
 - List available device UDIDs
@@ -34,6 +36,38 @@ The release binary will be available at:
 ```bash
 target/release/ilocation
 ```
+
+## Install The Agent Skill
+
+Browse the skills in this repo:
+
+```bash
+npx skills add BugenZhao/ilocation --list
+```
+
+Install the `ilocation` skill globally for Codex:
+
+```bash
+npx skills add BugenZhao/ilocation --skill ilocation -g -a codex -y
+```
+
+Install the same skill from the direct GitHub path:
+
+```bash
+npx skills add https://github.com/BugenZhao/ilocation/tree/main/skills/ilocation -g -a codex -y
+```
+
+The skill teaches a fresh agent how to:
+
+- install or update the `ilocation` binary from GitHub
+- verify the binary and discover device UDIDs
+- run `set`, `gpx`, and `clear`
+- prefer the default self-hosted mode unless the user explicitly asks for `tunneld`
+
+The `skills` CLI and source-format examples are documented by Vercel here:
+
+- [skills.sh](https://skills.sh)
+- [Vercel Agent Skills docs](https://vercel.com/docs/agent-resources/skills)
 
 ## Usage
 
@@ -134,3 +168,4 @@ ilocation --mode tunneld --host 127.0.0.1 --port 49151 list
 - Pressing `Ctrl-C` clears the simulated location before exit
 - If multiple devices are connected and `--udid` is omitted, the first matching device is used
 - `list` is the fastest way to discover a usable UDID before running `set`, `gpx`, or `clear`
+- The repo-level skill can be installed with `npx skills add BugenZhao/ilocation --skill ilocation`
