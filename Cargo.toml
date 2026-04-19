@@ -1,0 +1,12 @@
+[package]
+name = "ilocation"
+version = "0.1.0"
+edition = "2024"
+
+[dependencies]
+anyhow = "1.0"
+clap = { version = "4.5", features = ["derive"] }
+gpx = "0.10.0"
+idevice = { version = "0.1.58", features = ["core_device_proxy", "dvt", "location_simulation", "rsd", "tcp", "tunnel_tcp_stack", "tunneld", "usbmuxd"] }
+time = "0.3"
+tokio = { version = "1", features = ["macros", "rt-multi-thread", "signal"] }
