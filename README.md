@@ -2,7 +2,9 @@
 
 `ilocation` is a small Rust CLI for simulating GPS location on a USB-connected iPhone from macOS.
 
-It is designed around modern iOS device services and, by default, builds its own tunnel through `usbmuxd + CoreDeviceProxy`, so it does not require `pymobiledevice3 tunneld` or Xcode tooling at runtime.
+It builds its own tunnel through `usbmuxd + CoreDeviceProxy` by default. Location commands use the device's DVT developer services; Developer Mode and a usable Developer Disk Image (DDI) are prerequisites. Apple's device tooling can prepare those services when needed.
+
+Version **0.1.1** was verified on a USB-connected iPhone 16 Pro running **iOS 27.0 RC (24A435)** on 2026-09-13. See [the validation record](docs/validation-ios-27.md) for coverage and reproduction steps.
 
 This repo also ships an installable agent skill under [`skills/ilocation`](./skills/ilocation), so other users can install the skill with Vercel's `skills` CLI and let their agent install and operate the tool for them.
 
@@ -20,7 +22,8 @@ This repo also ships an installable agent skill under [`skills/ilocation`](./ski
 
 - macOS
 - A trusted, unlocked iPhone connected over USB
-- Rust toolchain for building from source
+- Developer Mode enabled on the iPhone and usable DDI services
+- Rust 1.94 or newer for building from source
 - Working `usbmuxd` on the host system
 
 For daily use, the default `self-hosted` mode is usually enough. You only need `tunneld` mode if you explicitly want to reuse an external tunnel.
@@ -28,7 +31,7 @@ For daily use, the default `self-hosted` mode is usually enough. You only need `
 ## Build
 
 ```bash
-cargo build --release
+cargo build --release --locked
 ```
 
 The release binary will be available at:
@@ -36,6 +39,9 @@ The release binary will be available at:
 ```bash
 target/release/ilocation
 ```
+
+Install the checked-out version with `cargo install --path . --locked --force`.
+Check the installed version with `ilocation --version`.
 
 ## Install The Agent Skill
 
@@ -166,6 +172,30 @@ ilocation --mode tunneld --host 127.0.0.1 --port 49151 list
 
 - Location simulation remains active only while the session is kept alive
 - Pressing `Ctrl-C` clears the simulated location before exit
-- If multiple devices are connected and `--udid` is omitted, the first matching device is used
+- If `--udid` is omitted, self-hosted mode selects the first USB device sorted by UDID, then falls back to other usbmuxd devices; tunneld mode selects the first sorted UDID
 - `list` is the fastest way to discover a usable UDID before running `set`, `gpx`, or `clear`
 - The repo-level skill can be installed with `npx skills add BugenZhao/ilocation --skill ilocation`
+
+## Developer services troubleshooting
+
+If opening `CoreDeviceProxy` or `com.apple.instruments.dtservicehub` fails, unlock and trust the phone, enable Developer Mode, and check DDI readiness:
+
+```bash
+xcrun devicectl device info ddiServices --device <UDID>
+```
+
+On a Command Line Tools installation that provides CoreDevice, use:
+
+```bash
+DEVELOPER_DIR=/Library/Developer/CommandLineTools /usr/bin/devicectl device info ddiServices --device <UDID>
+```
+
+Once developer services are ready, retry the same `ilocation` command. The default self-hosted mode manages its tunnel within the process.
+
+## Development checks
+
+```bash
+cargo fmt --check
+cargo test --release --locked
+cargo clippy --release --locked --all-targets -- -D warnings
+```

@@ -29,7 +29,10 @@ Before installation or execution, verify:
 - the machine is macOS
 - the iPhone is connected over USB
 - the iPhone is unlocked and trusted by the Mac
-- `cargo` is available, or the user is willing to install Rust first
+- Developer Mode is enabled and DDI developer services are usable
+- Rust 1.94 or newer and `cargo` are available, or the user is willing to install Rust first
+
+Version 0.1.1 was verified on iPhone 16 Pro with iOS 27.0 RC (24A435), using the default self-hosted mode. Coverage includes USB discovery, single-point location, fixed-interval and timestamp-based GPX replay, Ctrl-C cleanup, and standalone clear. Compass verified the simulated coordinates and return to the real location. See `docs/validation-ios-27.md` in the repository for the full record.
 
 If `cargo` is missing, pause and tell the user that `ilocation` is distributed as a Rust CLI and needs a Rust toolchain. Ask before installing Rust because that is a machine-wide change.
 
@@ -61,6 +64,7 @@ After installation, run:
 
 ```bash
 ilocation --help
+ilocation --version
 ilocation list
 ```
 
@@ -140,6 +144,9 @@ cargo install --path . --locked
 Only use `--mode tunneld` when the user asks for it or already has an external `tunneld` workflow they want to preserve.
 
 ## Troubleshooting
+
+- Opening CoreDeviceProxy or the DVT service fails
+  Unlock/trust the phone, verify Developer Mode, and run `xcrun devicectl device info ddiServices --device <UDID>` to check/prepare developer services. With Command Line Tools CoreDevice, use `DEVELOPER_DIR=/Library/Developer/CommandLineTools /usr/bin/devicectl device info ddiServices --device <UDID>`. Retry the self-hosted command after services are ready.
 
 - `cargo: command not found`
   Rust is not installed. Explain the blocker and ask before installing Rust.
