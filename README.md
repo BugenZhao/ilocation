@@ -56,6 +56,17 @@ Check the installed version with `ilocation --version`.
 
 ## Install The Agent Skill
 
+The skill follows the [Agent Skills specification](https://agentskills.io/specification):
+`skills/ilocation/SKILL.md` provides the name, description, and instructions;
+`scripts/` contains the bundled installer. The `skills` CLI discovers this directory
+directly from GitHub. Script paths are resolved relative to the installed skill.
+
+Install into the current project and select your agent interactively:
+
+```bash
+npx skills add BugenZhao/ilocation --skill ilocation
+```
+
 Browse the skills in this repo:
 
 ```bash

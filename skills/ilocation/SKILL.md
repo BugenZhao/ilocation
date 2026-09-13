@@ -36,16 +36,16 @@ Before installation or execution, verify:
 - Developer Mode is enabled and DDI developer services are usable
 - Rust 1.94 or newer and `cargo` are available, or the user is willing to install Rust first
 
-Version 0.1.1 was verified on iPhone 16 Pro with iOS 27.0 RC (24A435), using the default self-hosted mode. Coverage includes USB discovery, single-point location, fixed-interval and timestamp-based GPX replay, Ctrl-C cleanup, and standalone clear. Compass verified the simulated coordinates and return to the real location. See `docs/validation-ios-27.md` in the repository for the full record.
+Version 0.1.1 was verified on iPhone 16 Pro with iOS 27.0 RC (24A435), using the default self-hosted mode. Coverage includes USB discovery, single-point location, fixed-interval and timestamp-based GPX replay, Ctrl-C cleanup, and standalone clear. Compass verified the simulated coordinates and return to the real location. See the [iOS 27.0 RC validation record](https://github.com/BugenZhao/ilocation/blob/main/docs/validation-ios-27.md) for full coverage.
 
 If `cargo` is missing, pause and tell the user that `ilocation` is distributed as a Rust CLI and needs a Rust toolchain. Ask before installing Rust because that is a machine-wide change.
 
 ## Install Or Update ilocation
 
-Prefer the bundled installer script:
+Resolve the bundled [installer](scripts/install-ilocation.sh) relative to the directory containing this `SKILL.md`, then run it by absolute path from any working directory:
 
 ```bash
-bash skills/ilocation/scripts/install-ilocation.sh
+bash "<installed-skill-directory>/scripts/install-ilocation.sh"
 ```
 
 That script installs the latest `ilocation` binary from crates.io with:
