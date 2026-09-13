@@ -759,7 +759,7 @@ mod tests {
                 ..
             }
         ));
-        let cli = Cli::try_parse_from(["ilocation", "set", "Pasir Ris 8", "--poi", "--pick", "1"])
+        let cli = Cli::try_parse_from(["ilocation", "set", "Sonoma Plaza", "--poi", "--pick", "1"])
             .unwrap();
         assert!(matches!(
             cli.command,
