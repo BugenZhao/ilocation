@@ -26,9 +26,10 @@ jobs:
     env:
       RELEASE_TAG: ${{ inputs.tag || github.ref_name }}
       CARGO_TERM_COLOR: always
+      CARGO_BUILD_TARGET: aarch64-apple-darwin
       MACOSX_DEPLOYMENT_TARGET: '13.0'
     steps:
-      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+      - uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803 # v6
         with:
           ref: refs/tags/${{ inputs.tag || github.ref_name }}
           persist-credentials: false
@@ -66,11 +67,11 @@ jobs:
         run: |
           set -euo pipefail
           bundle="ilocation-${RELEASE_TAG}-aarch64-apple-darwin"
-          mkdir -p "dist/$bundle"
-          cp target/aarch64-apple-darwin/release/ilocation README.md LICENSE "dist/$bundle/"
-          cp -R examples "dist/$bundle/"
-          tar -czf "dist/$bundle.tar.gz" -C dist "$bundle"
-          cd dist
+          mkdir -p "target/dist/$bundle"
+          cp target/aarch64-apple-darwin/release/ilocation README.md LICENSE "target/dist/$bundle/"
+          cp -R examples "target/dist/$bundle/"
+          tar -czf "target/dist/$bundle.tar.gz" -C target/dist "$bundle"
+          cd target/dist
           shasum -a 256 "$bundle.tar.gz" > "$bundle.tar.gz.sha256"
 
       - name: Check crates.io version
@@ -112,8 +113,8 @@ jobs:
         run: |
           set -euo pipefail
           if gh release view "$RELEASE_TAG" >/dev/null 2>&1; then
-            gh release upload "$RELEASE_TAG" dist/*.tar.gz dist/*.sha256 --clobber
+            gh release upload "$RELEASE_TAG" target/dist/*.tar.gz target/dist/*.sha256 --clobber
           else
-            gh release create "$RELEASE_TAG" dist/*.tar.gz dist/*.sha256 \
+            gh release create "$RELEASE_TAG" target/dist/*.tar.gz target/dist/*.sha256 \
               --verify-tag --title "ilocation $RELEASE_TAG" --generate-notes
           fi
