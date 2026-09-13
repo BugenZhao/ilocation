@@ -1,6 +1,6 @@
 ---
 name: ilocation
-description: Install, update, and use the ilocation CLI from crates.io to list connected iPhone UDIDs, set or clear simulated GPS coordinates, or replay GPX tracks on macOS. Use when the user wants the ilocation tool itself, asks to install it on a machine, or wants an agent to run ilocation commands against a trusted USB-connected iPhone.
+description: Install, update, and use the ilocation CLI from crates.io to list connected iPhone UDIDs, set or clear simulated GPS coordinates, or replay GPX tracks on macOS. Use when the user wants the ilocation tool itself, asks to install it on a machine, or wants an agent to run ilocation commands against a trusted iPhone over USB or paired Wi-Fi.
 ---
 
 # ilocation Skill
@@ -31,7 +31,7 @@ Prefer that path unless the user explicitly asks to reuse `pymobiledevice3 tunne
 Before installation or execution, verify:
 
 - the machine is macOS
-- the iPhone is connected over USB
+- the iPhone is connected over USB or exposed as a paired network device by usbmuxd
 - the iPhone is unlocked and trusted by the Mac
 - Developer Mode is enabled and DDI developer services are usable
 - Rust 1.94 or newer and `cargo` are available, or the user is willing to install Rust first
@@ -89,6 +89,22 @@ If the user explicitly wants the external tunnel mode:
 ```bash
 ilocation --mode tunneld list
 ```
+
+### Use Wi-Fi
+
+Use `ilocation --transport wifi list` to discover paired network devices. The
+self-hosted backend can use them with the same `set`, `gpx`, and `clear` commands:
+
+```bash
+ilocation --transport wifi --udid <UDID> set "Pasir Ris 8" --poi -y
+ilocation --transport wifi --udid <UDID> clear
+```
+
+Initial setup uses Apple's USB trust/pairing and developer-service preparation.
+Keep the Mac and phone on the same IPv6-capable network. Check the startup log's
+`network:...` entry to verify the selected route. `--transport usb` forces USB;
+`auto` prefers USB even with an explicit UDID. Explicit `wifi` and `usb` filters
+apply to self-hosted mode. Preserve the user's transport choice during cleanup.
 
 ### Set a single coordinate
 

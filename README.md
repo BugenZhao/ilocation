@@ -1,6 +1,6 @@
 # ilocation
 
-`ilocation` is a small Rust CLI for simulating GPS location on a USB-connected iPhone from macOS.
+`ilocation` is a small Rust CLI for simulating GPS location on a paired iPhone over USB or Wi-Fi from macOS.
 
 It builds its own tunnel through `usbmuxd + CoreDeviceProxy` by default. Location commands use the device's DVT developer services; Developer Mode and a usable Developer Disk Image (DDI) are prerequisites. Apple's device tooling can prepare those services when needed.
 
@@ -22,7 +22,7 @@ This repo also ships an installable agent skill under [`skills/ilocation`](./ski
 ## Requirements
 
 - macOS
-- A trusted, unlocked iPhone connected over USB
+- A trusted, unlocked iPhone connected over USB or discoverable over Wi-Fi after pairing
 - Developer Mode enabled on the iPhone and usable DDI services
 - Rust 1.94 or newer for building from source
 - Working `usbmuxd` on the host system
@@ -194,6 +194,34 @@ its existing behavior; `--poi`, `--yes`, and `--pick` apply to place queries. `-
 - With `--respect-time`, adjacent GPX timestamps are used when both points have timestamps
 - After replay finishes, the last point remains active until you press `Ctrl-C`
 
+## Device Transport
+
+Self-hosted mode supports `--transport auto|usb|wifi`. [Pure Wi-Fi validation on iOS 27.0 RC](docs/validation-wifi-ios-27.md) covers cable removal, fresh sessions, GPX, and cleanup:
+
+```bash
+ilocation --transport wifi list
+ilocation --transport wifi --udid <UDID> set "Pasir Ris 8" --poi -y
+ilocation --transport wifi --udid <UDID> gpx examples/two-points.gpx
+ilocation --transport wifi --udid <UDID> clear
+```
+
+`auto` prefers USB, including when `--udid` is supplied, then selects an available
+network device. `usb` and `wifi` strictly filter the device list and connection;
+`wifi` selects a network entry exposed by macOS usbmuxd. Startup logs show the
+selected transport and usbmuxd device ID. Keep the session running to maintain
+simulation, and use Ctrl-C or `clear` to stop it.
+
+For initial setup, connect by USB, trust the Mac, enable Developer Mode, and prepare
+developer services with Apple's device tooling. Keep both devices on the same
+network with IPv6 support. Verify a `network:...` entry appears in
+`ilocation --transport wifi list` before disconnecting USB. This workflow reuses
+existing pairing records; initial pairing is managed by Apple's tools.
+
+If Wi-Fi discovery or connection fails, unlock the phone, check network isolation
+and reachability, and reconnect USB to check pairing and developer services.
+CoreDeviceProxy setup times out after 20 seconds. The `tunneld` backend manages
+its own transport and accepts the default `auto` value only.
+
 ## Tunnel modes
 
 ### `self-hosted`
@@ -226,7 +254,7 @@ ilocation --mode tunneld --host 127.0.0.1 --port 49151 list
 
 - Location simulation remains active only while the session is kept alive
 - Pressing `Ctrl-C` clears the simulated location before exit
-- If `--udid` is omitted, self-hosted mode selects the first USB device sorted by UDID, then falls back to other usbmuxd devices; tunneld mode selects the first sorted UDID
+- If `--udid` is omitted, self-hosted mode selects the first USB device sorted by UDID, then falls back to network devices; tunneld mode selects the first sorted UDID
 - `list` is the fastest way to discover a usable UDID before running `set`, `gpx`, or `clear`
 - The repo-level skill can be installed with `npx skills add BugenZhao/ilocation --skill ilocation`
 

@@ -85,6 +85,26 @@ enum TunnelMode {
     Tunneld,
 }
 
+#[derive(Clone, Copy, Debug, Eq, PartialEq, ValueEnum)]
+enum Transport {
+    /// Prefer USB, then use a network device exposed by usbmuxd.
+    Auto,
+    /// Use only USB devices.
+    Usb,
+    /// Use only network devices exposed by usbmuxd.
+    Wifi,
+}
+
+impl Transport {
+    fn matches(self, connection: &Connection) -> bool {
+        match self {
+            Self::Auto => matches!(connection, Connection::Usb | Connection::Network(_)),
+            Self::Usb => matches!(connection, Connection::Usb),
+            Self::Wifi => matches!(connection, Connection::Network(_)),
+        }
+    }
+}
+
 #[derive(Debug, Parser)]
 #[command(
     name = "ilocation",
@@ -99,6 +119,9 @@ struct Cli {
     /// Tunnel backend to use.
     #[arg(long, value_enum, default_value_t = TunnelMode::SelfHosted)]
     mode: TunnelMode,
+    /// Device transport for self-hosted mode (Wi-Fi requires prior pairing).
+    #[arg(long, value_enum, default_value_t = Transport::Auto)]
+    transport: Transport,
     /// Host for tunneld when --mode=tunneld.
     #[arg(long, default_value = "127.0.0.1")]
     host: IpAddr,
@@ -193,13 +216,16 @@ fn resolve_set(
 }
 
 async fn run(cli: Cli, coordinate: Option<(f64, f64)>) -> anyhow::Result<()> {
+    if cli.mode == TunnelMode::Tunneld && cli.transport != Transport::Auto {
+        bail!("--transport applies to self-hosted mode; tunneld manages its own transport");
+    }
     if matches!(cli.command, Command::List) {
-        list_available_devices(cli.mode, cli.tunneld_socket()).await?;
+        list_available_devices(cli.mode, cli.tunneld_socket(), cli.transport).await?;
         return Ok(());
     }
 
     let (_udid, mut dvt, tunnel_keeper) = match cli.mode {
-        TunnelMode::SelfHosted => connect_dvt_via_usbmuxd(cli.udid.as_deref())
+        TunnelMode::SelfHosted => connect_dvt_via_usbmuxd(cli.udid.as_deref(), cli.transport)
             .await
             .context("failed to build a software tunnel via usbmuxd/CoreDeviceProxy")?,
         TunnelMode::Tunneld => connect_dvt_via_tunneld(cli.tunneld_socket(), cli.udid.as_deref())
@@ -253,6 +279,7 @@ impl Cli {
 
 async fn connect_dvt_via_usbmuxd(
     requested_udid: Option<&str>,
+    transport: Transport,
 ) -> anyhow::Result<(String, RemoteServerClient<Box<dyn ReadWrite>>, TunnelKeeper)> {
     let addr = UsbmuxdAddr::from_env_var().context("invalid USBMUXD_SOCKET_ADDRESS")?;
     let mut mux = addr
@@ -264,14 +291,19 @@ async fn connect_dvt_via_usbmuxd(
         .await
         .context("failed to enumerate devices from usbmuxd")?;
 
-    let device = pick_usbmuxd_device(devices, requested_udid)?;
+    let device = pick_usbmuxd_device(devices, requested_udid, transport)?;
     let udid = device.udid.clone();
     let provider = device.to_provider(addr, "ilocation");
 
-    eprintln!("using device {udid} via usbmuxd/CoreDeviceProxy");
+    eprintln!(
+        "using device {udid} via {} (usbmuxd device {}, CoreDeviceProxy)",
+        usb_connection_label(&device),
+        device.device_id
+    );
 
-    let proxy = CoreDeviceProxy::connect(&provider)
+    let proxy = tokio::time::timeout(Duration::from_secs(20), CoreDeviceProxy::connect(&provider))
         .await
+        .context("CoreDeviceProxy connection timed out after 20 seconds; check device unlock and network reachability")?
         .context("failed to connect to CoreDeviceProxy")?;
     let rsd_port = proxy.tunnel_info().server_rsd_port;
     let adapter = proxy
@@ -338,6 +370,7 @@ async fn connect_dvt_via_tunneld(
 async fn list_available_devices(
     mode: TunnelMode,
     tunneld_socket: SocketAddr,
+    transport: Transport,
 ) -> anyhow::Result<()> {
     match mode {
         TunnelMode::SelfHosted => {
@@ -351,8 +384,9 @@ async fn list_available_devices(
                 .await
                 .context("failed to enumerate devices from usbmuxd")?;
 
+            devices.retain(|device| transport.matches(&device.connection_type));
             if devices.is_empty() {
-                bail!("no devices exposed by usbmuxd");
+                bail!("no {transport:?} devices exposed by usbmuxd");
             }
 
             devices.sort_by(|a, b| a.udid.cmp(&b.udid));
@@ -619,35 +653,25 @@ fn pick_tunneld_device(
 fn pick_usbmuxd_device(
     devices: Vec<UsbmuxdDevice>,
     requested_udid: Option<&str>,
+    transport: Transport,
 ) -> anyhow::Result<UsbmuxdDevice> {
-    if devices.is_empty() {
-        bail!("no devices exposed by usbmuxd");
-    }
-
-    if let Some(udid) = requested_udid {
-        return devices
-            .into_iter()
-            .find(|device| device.udid == udid)
-            .ok_or_else(|| anyhow!("device {udid} not found in usbmuxd output"));
-    }
-
-    let mut usb_devices: Vec<_> = devices
-        .iter()
-        .filter(|device| device.connection_type == Connection::Usb)
-        .cloned()
-        .collect();
-    usb_devices.sort_by(|a, b| a.udid.cmp(&b.udid));
-
-    if let Some(device) = usb_devices.into_iter().next() {
-        return Ok(device);
-    }
-
-    let mut devices = devices;
-    devices.sort_by(|a, b| a.udid.cmp(&b.udid));
-    devices
+    let mut candidates: Vec<_> = devices
         .into_iter()
-        .next()
-        .ok_or_else(|| anyhow!("no devices available after filtering"))
+        .filter(|device| {
+            requested_udid.is_none_or(|udid| device.udid == udid)
+                && transport.matches(&device.connection_type)
+        })
+        .collect();
+    candidates.sort_by_key(|device| {
+        (
+            !matches!(device.connection_type, Connection::Usb),
+            device.udid.clone(),
+            device.device_id,
+        )
+    });
+    candidates.into_iter().next().with_context(|| {
+        format!("no {transport:?} device {} exposed by usbmuxd; check connection, pairing and unlock state", requested_udid.unwrap_or("matching the request"))
+    })
 }
 
 fn ensure_positive(label: &str, value: f64) -> anyhow::Result<()> {
@@ -677,6 +701,53 @@ fn validate_coordinate(label: &str, value: f64) -> anyhow::Result<()> {
 mod tests {
     use super::*;
     use std::io::Cursor;
+
+    #[test]
+    fn transport_selection_is_explicit_and_usb_preferred() {
+        let devices = || {
+            vec![
+                UsbmuxdDevice {
+                    udid: "phone".into(),
+                    device_id: 1,
+                    connection_type: Connection::Network("127.0.0.1".parse().unwrap()),
+                },
+                UsbmuxdDevice {
+                    udid: "phone".into(),
+                    device_id: 2,
+                    connection_type: Connection::Usb,
+                },
+            ]
+        };
+        for udid in [None, Some("phone")] {
+            assert_eq!(
+                pick_usbmuxd_device(devices(), udid, Transport::Auto)
+                    .unwrap()
+                    .device_id,
+                2
+            );
+            assert_eq!(
+                pick_usbmuxd_device(devices(), udid, Transport::Wifi)
+                    .unwrap()
+                    .device_id,
+                1
+            );
+            assert_eq!(
+                pick_usbmuxd_device(devices(), udid, Transport::Usb)
+                    .unwrap()
+                    .device_id,
+                2
+            );
+        }
+        let network_only = || vec![devices().remove(0)];
+        assert!(pick_usbmuxd_device(network_only(), None, Transport::Usb).is_err());
+        assert_eq!(
+            pick_usbmuxd_device(network_only(), None, Transport::Auto)
+                .unwrap()
+                .device_id,
+            1
+        );
+        assert!(pick_usbmuxd_device(devices(), Some("missing"), Transport::Wifi).is_err());
+    }
 
     #[test]
     fn set_parses_coordinates_and_place_options() {
