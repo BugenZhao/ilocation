@@ -281,3 +281,28 @@ cargo fmt --check
 cargo test --release --locked
 cargo clippy --release --locked --all-targets -- -D warnings
 ```
+
+## Releases
+
+Pushing a stable version tag such as `v0.2.0` runs
+[the release workflow](.github/workflows/release.yml). The tag must match the
+version in `Cargo.toml`. The workflow runs tests and Clippy, builds the
+`aarch64-apple-darwin` executable, publishes to crates.io using Trusted Publishing,
+and creates a GitHub Release containing a `.tar.gz` archive and SHA-256 checksum.
+The archive includes the binary, license, README, and example GPX files.
+
+Maintainers configure the crate's GitHub Trusted Publisher with owner `BugenZhao`,
+repository `ilocation`, workflow `release.yml`, and an empty environment field.
+GitHub Actions obtains a short-lived crates.io token through OIDC. The workflow
+also accepts an existing tag through **Run workflow** to retry a release; an
+already-published crate version is skipped and GitHub assets are replaced.
+
+```bash
+git tag v0.2.0
+git push origin v0.2.0
+```
+
+Prebuilt macOS arm64 binaries are available from
+[GitHub Releases](https://github.com/BugenZhao/ilocation/releases). Extract the
+archive and run `./ilocation --version`. The binary targets macOS 13+, with
+place search requiring macOS 26+.
