@@ -1,6 +1,6 @@
 ---
 name: ilocation
-description: Install, update, and use the ilocation CLI from https://github.com/BugenZhao/ilocation to list connected iPhone UDIDs, set or clear simulated GPS coordinates, or replay GPX tracks on macOS. Use when the user wants the ilocation tool itself, asks to install it on a machine, or wants an agent to run ilocation commands against a trusted USB-connected iPhone.
+description: Install, update, and use the ilocation CLI from crates.io to list connected iPhone UDIDs, set or clear simulated GPS coordinates, or replay GPX tracks on macOS. Use when the user wants the ilocation tool itself, asks to install it on a machine, or wants an agent to run ilocation commands against a trusted USB-connected iPhone.
 ---
 
 # ilocation Skill
@@ -9,7 +9,11 @@ description: Install, update, and use the ilocation CLI from https://github.com/
 
 Use this skill when the user wants the exact `ilocation` CLI, not a generic `pymobiledevice3` or `go-ios` workflow.
 
-`ilocation` is a Rust CLI hosted at:
+`ilocation` is a Rust CLI published at:
+
+- `https://crates.io/crates/ilocation`
+
+Source code and this agent skill are hosted at:
 
 - `https://github.com/BugenZhao/ilocation`
 
@@ -44,10 +48,10 @@ Prefer the bundled installer script:
 bash skills/ilocation/scripts/install-ilocation.sh
 ```
 
-That script installs the latest `ilocation` binary from GitHub with:
+That script installs the latest `ilocation` binary from crates.io with:
 
 ```bash
-cargo install --git https://github.com/BugenZhao/ilocation --locked --force ilocation
+cargo install ilocation --locked
 ```
 
 The binary is normally placed at:

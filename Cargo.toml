@@ -3,6 +3,13 @@ name = "ilocation"
 version = "0.1.1"
 edition = "2024"
 rust-version = "1.94"
+description = "Simulate GPS locations and replay GPX routes on a USB-connected iPhone"
+license = "MIT"
+repository = "https://github.com/BugenZhao/ilocation"
+readme = "README.md"
+keywords = ["ios", "iphone", "gps", "location", "gpx"]
+categories = ["command-line-utilities"]
+include = ["src/**", "Cargo.toml", "Cargo.lock", "README.md", "LICENSE", "examples/**", "docs/**", "skills/**"]
 
 [dependencies]
 anyhow = "1.0.104"

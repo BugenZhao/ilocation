@@ -28,7 +28,18 @@ This repo also ships an installable agent skill under [`skills/ilocation`](./ski
 
 For daily use, the default `self-hosted` mode is usually enough. You only need `tunneld` mode if you explicitly want to reuse an external tunnel.
 
-## Build
+## Install
+
+Install the latest release from [crates.io](https://crates.io/crates/ilocation):
+
+```bash
+cargo install ilocation --locked
+ilocation --version
+```
+
+Run the same install command to upgrade when a newer release is available.
+
+## Build From Source
 
 ```bash
 cargo build --release --locked
@@ -65,7 +76,7 @@ npx skills add https://github.com/BugenZhao/ilocation/tree/main/skills/ilocation
 
 The skill teaches a fresh agent how to:
 
-- install or update the `ilocation` binary from GitHub
+- install or update the `ilocation` binary from crates.io
 - verify the binary and discover device UDIDs
 - run `set`, `gpx`, and `clear`
 - prefer the default self-hosted mode unless the user explicitly asks for `tunneld`

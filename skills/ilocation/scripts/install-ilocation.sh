@@ -1,7 +1,6 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
-REPO_URL="${ILOCATION_REPO_URL:-https://github.com/BugenZhao/ilocation}"
 CARGO_BIN_DIR="${CARGO_HOME:-$HOME/.cargo}/bin"
 
 if ! command -v cargo >/dev/null 2>&1; then
@@ -14,7 +13,7 @@ if [[ "$(uname -s)" != "Darwin" ]]; then
   echo "warning: ilocation is primarily intended for macOS hosts." >&2
 fi
 
-cargo install --git "$REPO_URL" --locked --force ilocation
+cargo install ilocation --locked
 
 echo "Installed ilocation to: $CARGO_BIN_DIR/ilocation"
 echo "$CARGO_BIN_DIR/ilocation"
