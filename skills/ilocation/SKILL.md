@@ -100,6 +100,32 @@ ilocation --udid <UDID> set <LATITUDE> <LONGITUDE>
 
 Keep the process alive while the simulated location should remain active. When the user wants to stop spoofing, send `Ctrl-C`; `ilocation` clears the simulated location on exit.
 
+### Search for a place (ilocation 0.2.0+, macOS 26+)
+
+Use `ilocation search "Pasir Ris 8" --poi` to inspect candidates without a connected
+phone or changing location. Results go to stdout and the command exits without
+prompting. Then use `set` to apply the intended location.
+
+Use native Apple Maps search with an internet connection:
+
+```bash
+ilocation --udid <UDID> set "pasir ris 8, singapore"
+ilocation --udid <UDID> set "Pasir Ris 8" --poi
+```
+
+Review the returned names, addresses, and coordinates and select the intended
+number. `--poi` limits results to points of interest. Search wording affects
+matching: the first example can resolve to 8 Pasir Ris Way, while the second
+matched the Pasir Ris 8 condominium during local validation.
+
+Use `ilocation set "Pasir Ris 8" --poi -y` to automatically use the first result.
+`--yes` (`-y`) and `--pick` are mutually exclusive.
+
+For a non-interactive invocation, add `--yes` to use the first result or `--pick <NUMBER>` to select an explicit
+one-based result. Prefer coordinates when repeatability matters, because search
+ranking can change. Search finishes before a device session is opened. Numeric
+coordinates continue to work on the existing supported systems.
+
 ### Replay a GPX route
 
 Use:

@@ -1,6 +1,6 @@
 [package]
 name = "ilocation"
-version = "0.1.1"
+version = "0.2.0"
 edition = "2024"
 rust-version = "1.94"
 description = "Simulate GPS locations and replay GPX routes on a USB-connected iPhone"
@@ -18,3 +18,9 @@ gpx = "0.10.0"
 idevice = { version = "0.1.65", features = ["core_device_proxy", "dvt", "location_simulation", "rsd", "tcp", "tunnel_tcp_stack", "tunneld", "usbmuxd"] }
 time = "0.3.55"
 tokio = { version = "1.53.1", features = ["macros", "rt-multi-thread", "signal"] }
+
+[target.'cfg(target_os = "macos")'.dependencies]
+objc2 = "0.6.4"
+block2 = "0.6.2"
+objc2-foundation = { version = "0.3.2", default-features = false, features = ["std", "NSString", "NSError", "NSDate", "NSRunLoop", "NSObjCRuntime", "NSEnumerator"] }
+objc2-map-kit = { version = "0.3.2", default-features = false, features = ["std", "MKLocalSearch", "MKLocalSearchRequest", "MKLocalSearchResponse", "MKMapItem", "MKAddress", "objc2-core-location", "block2"] }

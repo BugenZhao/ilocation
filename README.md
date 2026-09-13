@@ -12,6 +12,7 @@ This repo also ships an installable agent skill under [`skills/ilocation`](./ski
 
 - List available device UDIDs
 - Simulate a single latitude/longitude pair
+- Search Apple Maps by place name or address, with optional POI filtering
 - Replay coordinates from a GPX file
 - Clear an existing simulated location
 - Use either:
@@ -152,6 +153,37 @@ Clear simulated location:
 ```bash
 ilocation --udid 00008140-001969981412801C clear
 ```
+
+## Place Search
+
+Starting with 0.2.0, `set` accepts a quoted place name or address on macOS 26+.
+Search uses native Apple MapKit and requires an internet connection. The CLI uses
+system frameworks and needs no API key or separate app bundle.
+
+```bash
+ilocation search "pasir ris 8, singapore"
+ilocation search "Pasir Ris 8" --poi
+ilocation set "pasir ris 8, singapore"
+ilocation set "Pasir Ris 8" --poi
+ilocation set "Pasir Ris 8" --poi -y
+ilocation set "Pasir Ris 8" --poi --pick 1
+```
+
+`search` prints candidates to stdout and exits, with no device connection or selection
+prompt. It also works when the phone is unplugged; progress messages go to stderr.
+
+The default search can return addresses, roads, and places. `--poi` restricts results
+to points of interest such as buildings, shops, and stations. Results include names,
+addresses, and coordinates; choose a numbered result or press Enter to cancel.
+Even a single result is shown for selection, since similar queries can match different
+places. For example, the local MapKit probe matched `pasir ris 8, singapore` to
+8 Pasir Ris Way, while `Pasir Ris 8 --poi` matched the condominium.
+
+For scripts, `--yes` (`-y`) automatically uses the first result; `--pick <NUMBER>` selects the one-based result directly. Result ordering
+can change; use explicit coordinates for repeatable automation. Non-interactive
+input requires `--yes` or `--pick`. Search and selection complete before opening a device
+session, and searches time out after 20 seconds. Numeric `set <LAT> <LON>` retains
+its existing behavior; `--poi`, `--yes`, and `--pick` apply to place queries. `--yes` and `--pick` are mutually exclusive.
 
 ## GPX behavior
 

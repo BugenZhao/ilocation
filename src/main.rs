@@ -1,3 +1,5 @@
+mod geocoding;
+
 use std::{
     collections::HashMap,
     fs::File,
@@ -30,12 +32,31 @@ use time::OffsetDateTime;
 enum Command {
     /// List available device UDIDs.
     List,
-    /// Simulate a single GPS coordinate and keep it active until Ctrl-C.
+    /// Search Apple Maps and print candidates without connecting to a device.
+    Search {
+        /// Quoted place name or address.
+        query: String,
+        /// Search only points of interest.
+        #[arg(long)]
+        poi: bool,
+    },
+    /// Simulate coordinates or search for a place and keep it active until Ctrl-C.
     Set {
-        /// Latitude in decimal degrees.
-        latitude: f64,
-        /// Longitude in decimal degrees.
-        longitude: f64,
+        /// Latitude, or a quoted place name/address.
+        #[arg(allow_negative_numbers = true)]
+        latitude_or_place: String,
+        /// Longitude in decimal degrees when supplying a latitude.
+        #[arg(allow_negative_numbers = true)]
+        longitude: Option<f64>,
+        /// Search only points of interest (buildings, shops, stations, etc.).
+        #[arg(long, conflicts_with = "longitude")]
+        poi: bool,
+        /// Select a one-based search result without prompting.
+        #[arg(long, conflicts_with = "longitude", value_parser = clap::value_parser!(u32).range(1..))]
+        pick: Option<u32>,
+        /// Automatically use the first place search result.
+        #[arg(short = 'y', long, conflicts_with_all = ["longitude", "pick"])]
+        yes: bool,
     },
     /// Replay points from a GPX file and keep the final point active until Ctrl-C.
     Gpx {
@@ -115,16 +136,63 @@ struct GpxReplay {
     source: &'static str,
 }
 
-#[tokio::main]
-async fn main() {
-    if let Err(err) = run().await {
+fn main() {
+    if let Err(err) = main_result() {
         eprintln!("error: {err:#}");
         process::exit(1);
     }
 }
 
-async fn run() -> anyhow::Result<()> {
+fn main_result() -> anyhow::Result<()> {
     let cli = Cli::parse();
+    if let Command::Search { query, poi } = &cli.command {
+        let places = geocoding::search(query, *poi)?;
+        geocoding::print_places(&places, &mut std::io::stdout().lock())?;
+        return Ok(());
+    }
+    // MapKit and its run loop run on the main thread, before opening any device session.
+    let coordinate = match &cli.command {
+        Command::Set {
+            latitude_or_place,
+            longitude,
+            poi,
+            pick,
+            yes,
+        } => Some(resolve_set(
+            latitude_or_place,
+            *longitude,
+            *poi,
+            if *yes { Some(1) } else { *pick },
+        )?),
+        _ => None,
+    };
+    tokio::runtime::Runtime::new()?.block_on(run(cli, coordinate))
+}
+
+fn resolve_set(
+    input: &str,
+    longitude: Option<f64>,
+    poi: bool,
+    pick: Option<u32>,
+) -> anyhow::Result<(f64, f64)> {
+    if let Some(longitude) = longitude {
+        let latitude = input
+            .parse::<f64>()
+            .context("latitude must be a number when longitude is supplied")?;
+        validate_coordinate("latitude", latitude)?;
+        validate_coordinate("longitude", longitude)?;
+        return Ok((latitude, longitude));
+    }
+    if input.parse::<f64>().is_ok() {
+        bail!("a numeric latitude requires a longitude");
+    }
+    if input.trim().is_empty() {
+        bail!("place query must contain text");
+    }
+    geocoding::select(geocoding::search(input, poi)?, pick)
+}
+
+async fn run(cli: Cli, coordinate: Option<(f64, f64)>) -> anyhow::Result<()> {
     if matches!(cli.command, Command::List) {
         list_available_devices(cli.mode, cli.tunneld_socket()).await?;
         return Ok(());
@@ -148,11 +216,13 @@ async fn run() -> anyhow::Result<()> {
         .context("failed to open LocationSimulation service")?;
 
     match cli.command {
-        Command::List => unreachable!("list is handled before opening a location session"),
-        Command::Set {
-            latitude,
-            longitude,
-        } => run_single_point(&mut location, latitude, longitude).await?,
+        Command::List | Command::Search { .. } => {
+            unreachable!("read-only commands are handled before opening a location session")
+        }
+        Command::Set { .. } => {
+            let (latitude, longitude) = coordinate.context("missing resolved coordinates")?;
+            run_single_point(&mut location, latitude, longitude).await?;
+        }
         Command::Gpx {
             file,
             interval,
@@ -607,6 +677,46 @@ fn validate_coordinate(label: &str, value: f64) -> anyhow::Result<()> {
 mod tests {
     use super::*;
     use std::io::Cursor;
+
+    #[test]
+    fn set_parses_coordinates_and_place_options() {
+        let cli = Cli::try_parse_from(["ilocation", "set", "-33.9", "-151.2"]).unwrap();
+        assert!(matches!(
+            cli.command,
+            Command::Set {
+                longitude: Some(-151.2),
+                ..
+            }
+        ));
+        let cli = Cli::try_parse_from(["ilocation", "set", "Pasir Ris 8", "--poi", "--pick", "1"])
+            .unwrap();
+        assert!(matches!(
+            cli.command,
+            Command::Set {
+                longitude: None,
+                poi: true,
+                pick: Some(1),
+                ..
+            }
+        ));
+        assert!(Cli::try_parse_from(["ilocation", "set", "1", "103", "--poi"]).is_err());
+        assert!(Cli::try_parse_from(["ilocation", "set", "place", "--pick", "0"]).is_err());
+        for flag in ["--yes", "-y"] {
+            let cli = Cli::try_parse_from(["ilocation", "set", "place", flag]).unwrap();
+            assert!(matches!(cli.command, Command::Set { yes: true, .. }));
+        }
+        assert!(
+            Cli::try_parse_from(["ilocation", "set", "place", "--yes", "--pick", "2"]).is_err()
+        );
+        assert!(Cli::try_parse_from(["ilocation", "set", "1", "103", "--yes"]).is_err());
+        assert_eq!(
+            resolve_set("-33.9", Some(-151.2), false, None).unwrap(),
+            (-33.9, -151.2)
+        );
+        assert!(resolve_set("91", Some(103.0), false, None).is_err());
+        assert!(resolve_set("1.3", None, false, None).is_err());
+        assert!(resolve_set(" ", None, false, None).is_err());
+    }
 
     #[test]
     fn prefers_track_points_over_waypoints() {
